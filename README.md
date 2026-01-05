@@ -1,4 +1,10 @@
-SCRIPT Overview + How to use
+--> Project Overview
+
+Quotation processor for VISPL
+
+This project extracts structured data from industrial quotation PDFs and converts it into a consolidated CSV using a two-step terminal workflow.
+
+--> Project Structure
 
 quotations-processor/
 │
@@ -13,15 +19,18 @@ quotations-processor/
 │ └── archive/
 │
 ├── processed/ # processed PDFs
+├── quotation/ # input quotation PDFs
 
----
-
-Workflow:
+--> Workflow
 Add PDFs → Run processor → Run builder → CSV updated
 
----
+--> Notes & Behavior
 
-- All processed PDFs will be moved to the processed folder, so you can keep adding new PDFs if required.
-- quotation_details.csv will keep getting updated with new information from the new PDFs
-  (Delete the existing csv to start maaking a new one)
-- archive folder will have the date and time stamp for all processed (batched) pdfs.
+All processed PDFs are automatically moved to the processed/ folder
+(you can keep adding new PDFs to the input folder)
+
+quotation_details.csv is continuously updated with data from newly processed PDFs
+(delete the CSV if you want to start fresh)
+
+The archive/ folder stores timestamped processed text files for each batch run,
+providing a clear audit trail
