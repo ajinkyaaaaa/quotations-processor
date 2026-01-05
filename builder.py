@@ -97,13 +97,13 @@ def build_csv():
         return
 
     if not os.path.exists(INPUT_FILE):
-        logging.error(
-            "Processor has not been run yet.\n"
-            "No processed_output.txt found in output folder."
+        logging.warning(
+            "No processed_output.txt found in output folder.\n"
+            "[End] Please run the processor first.\n"
         )
         return
 
-    logging.info("Found processed_output.txt — starting CSV build")
+    logging.info("[Start] Found processed_output.txt — starting CSV build")
 
     raw_text = Path(INPUT_FILE).read_text(encoding="utf-8")
     raw_text = strip_code_fences(raw_text)
@@ -201,7 +201,7 @@ def build_csv():
     os.rename(INPUT_FILE, archived_path)
 
     logging.info(
-        "Processed file archived as: %s",
+        "[Success] Processed file archived as: %s\n",
         archived_path
     )
 

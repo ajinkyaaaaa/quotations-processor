@@ -196,10 +196,10 @@ def main():
     pdf_files = [f for f in os.listdir(PDF_FOLDER) if f.lower().endswith(".pdf")]
 
     if not pdf_files:
-        logging.warning("No PDFs found in folder.")
+        logging.warning("[End] No PDFs found in folder.")
         return
 
-    logging.info("Found %d PDFs", len(pdf_files))
+    logging.info("[Start] Found %d PDFs", len(pdf_files))
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
         for pdf_name in pdf_files:
@@ -221,7 +221,7 @@ def main():
                     if is_valid_item(i)
                 ]
 
-                logging.info("Valid items found: %d", len(items))
+                logging.info("Found %d item(s)", len(items))
 
                 outfile.write("\n" + "=" * 80 + "\n")
                 outfile.write(f"PDF FILE: {pdf_name}\n")
@@ -229,13 +229,13 @@ def main():
                 outfile.write(base_data + "\n\n")
 
                 for idx, item in enumerate(items, start=1):
-                    logging.info("Processing item %d/%d", idx, len(items))
                     outfile.write(
                         structure_item_with_llm(
                             clean_item_text(item),
                             client
                         ) + "\n\n"
                     )
+                logging.info("Processed %d/%d item(s)", idx, len(items))
 
                 # Move processed PDF
                 shutil.move(
@@ -244,9 +244,9 @@ def main():
                 )
 
             except Exception as e:
-                logging.error("Failed processing %s: %s", pdf_name, e)
+                logging.error("[Failure] Failed processing %s: %s", pdf_name, e)
 
-    logging.info("Processing completed. Output written to %s", OUTPUT_FILE)
+    logging.info("[Success] Processing completed. Output written to %s\n", OUTPUT_FILE)
 
 
 # -----------------------------
