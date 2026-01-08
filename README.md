@@ -34,3 +34,9 @@ quotation_details.csv is continuously updated with data from newly processed PDF
 
 The archive/ folder stores timestamped processed text files for each batch run,
 providing a clear audit trail
+
+Setup + Run:
+
+1. add pdf folder and the path of that in the .env
+2. activate venv
+3. run processor -> run builder

@@ -64,6 +64,7 @@ Rules:
 - Do NOT infer or guess
 - If a field is missing, return "-"
 - Preserve original formatting
+- Quotatoin number is a 7 digit number
 
 BASE_DATA_BEGIN
 date:
@@ -89,6 +90,7 @@ Rules:
 - Keep original formatting for numbers and currency
 - part_description must include ALL descriptive text lines related to the item
 - Exclude prices, quantities, delivery time, country of origin, and commodity codes from description
+- Part number can be a 6 digit number of a combination of letters and numbers
 
 BEGIN_ITEM
 part_number:
