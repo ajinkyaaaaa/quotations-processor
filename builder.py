@@ -49,6 +49,11 @@ CSV_COLUMNS = [
     "item_no",
     "part_number",
     "part_description",
+    "part_quantity",
+    "unit_price",
+    "discount",
+    "total_price",
+    "delivery_time",
     "date",
     "reference",
     "customer_code",
@@ -86,9 +91,24 @@ def extract_pdf_sections(text: str):
     )
     return pattern.findall(text)
 
+def get_last_sr_no(csv_path: str) -> int:
+    if not os.path.exists(csv_path):
+        return 0
+
+    try:
+        with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            if not rows:
+                return 0
+            return int(rows[-1]["Sr_no"])
+    except Exception:
+        return 0
+    
 # -----------------------------
 # MAIN BUILDER
 # -----------------------------
+
 def build_csv():
     choice = input("\nRun builder? (y/n): ").strip().lower()
 
@@ -109,7 +129,9 @@ def build_csv():
     raw_text = strip_code_fences(raw_text)
 
     rows = []
-    global_index = 1
+    last_sr_no = get_last_sr_no(OUTPUT_CSV)
+    global_index = last_sr_no + 1
+
 
     pdf_sections = extract_pdf_sections(raw_text)
 
@@ -155,8 +177,17 @@ def build_csv():
                 "quotation_number": quotation_number,
                 "enquiry": enquiry,
                 "item_no": item_count,
-                "part_number": item_data.get("part_number", "-"),
-                "part_description": item_data.get("part_description", "-"),
+
+                # ITEM-LEVEL FIELDS
+                "part_number": item_data.get("part_number", ""),
+                "part_description": item_data.get("part_description", ""),
+                "part_quantity": item_data.get("part_quantity", ""),
+                "unit_price": item_data.get("unit_price", ""),
+                "discount": item_data.get("discount", ""),
+                "total_price": item_data.get("total_price", ""),
+                "delivery_time": item_data.get("delivery_time", ""),
+
+                # HEADER / META
                 "date": date,
                 "reference": reference,
                 "customer_code": customer_code,
@@ -177,7 +208,7 @@ def build_csv():
     # -----------------------------
     file_exists = os.path.exists(OUTPUT_CSV)
 
-    with open(OUTPUT_CSV, "a", newline="", encoding="utf-8") as f:
+    with open(OUTPUT_CSV, "a", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
 
         if not file_exists:

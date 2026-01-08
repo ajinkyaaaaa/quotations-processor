@@ -196,16 +196,17 @@ def main():
     pdf_files = [f for f in os.listdir(PDF_FOLDER) if f.lower().endswith(".pdf")]
 
     if not pdf_files:
-        logging.warning("[End] No PDFs found in folder.")
+        logging.warning("[End] No PDFs found in folder.\n")
         return
 
     logging.info("[Start] Found %d PDFs", len(pdf_files))
 
+    count = 1
     with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
         for pdf_name in pdf_files:
             pdf_path = os.path.join(PDF_FOLDER, pdf_name)
-            logging.info("Processing PDF: %s", pdf_name)
-
+            logging.info(f"[{count}/{len(pdf_files)}] Processing PDF: %s", pdf_name)
+            count += 1
             try:
                 full_text = extract_text_from_pdf(pdf_path)
 
