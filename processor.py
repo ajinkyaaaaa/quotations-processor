@@ -62,9 +62,9 @@ You are extracting header-level metadata from an industrial quotation.
 Rules:
 - Use ONLY the provided text
 - Do NOT infer or guess
-- If a field is missing, return "-"
+- If a field is missing, return ""
 - Preserve original formatting
-- Quotatoin number is a 7 digit number
+- Quotation number is a 7 digit number
 
 BASE_DATA_BEGIN
 date:
@@ -86,7 +86,7 @@ You are extracting structured line-item data from an industrial quotation.
 Rules:
 - Use ONLY the provided text
 - Do NOT infer or guess
-- If a field is missing, return "-"
+- If a field is missing, return None data type (i.e., leave it blank)
 - Keep original formatting for numbers and currency
 - part_description must include ALL descriptive text lines related to the item
 - Exclude prices, quantities, delivery time, country of origin, and commodity codes from description
@@ -120,11 +120,55 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 pages.append(text)
     return "\n".join(pages)
 
+def normalize_part_quantity(item_block: str) -> str:
+    lines = item_block.splitlines()
+    normalized_lines = []
+
+    for line in lines:
+        if line.lower().startswith("part_quantity:"):
+            key, value = line.split(":", 1)
+            qty = value.strip()
+
+            # If quantity exists and has no unit → append " pc"
+            if qty and not re.search(r"\b(pc|pcs|stk)\b", qty.lower()):
+                if re.fullmatch(r"\d+", qty):
+                    qty = f"{qty} pc"
+
+            normalized_lines.append(f"{key}: {qty}")
+        else:
+            normalized_lines.append(line)
+
+    return "\n".join(normalized_lines)
+
+
+def is_fully_empty_item(item_block: str) -> bool:
+    """
+    Returns True if ALL fields are empty, "", or None.
+    """
+    for line in item_block.splitlines():
+        if ":" in line:
+            _, value = line.split(":", 1)
+            value = value.strip().lower()
+
+            if value not in ("", '""', "none", "null"):
+                return False
+
+    return True
+
 
 def extract_table_region(full_text: str) -> str:
     if TABLE_START not in full_text or TABLE_END not in full_text:
         raise ValueError("Table boundaries not found")
     return full_text.split(TABLE_START, 1)[1].split(TABLE_END, 1)[0].strip()
+
+def is_table_header_block(block: str) -> bool:
+    header_markers = [
+        "Pos. Item/Description",
+        "Quantity Price",
+        "Amount in EUR",
+    ]
+    block_lower = block.lower()
+    return all(h.lower() in block_lower for h in header_markers)
 
 
 def extract_header_region(full_text: str) -> str:
@@ -136,7 +180,7 @@ def extract_header_region(full_text: str) -> str:
 def split_into_items(table_text: str):
     lines = table_text.split("\n")
     items, current_item = [], []
-    pos_pattern = re.compile(r"^\s*\d{1,2},\d")
+    pos_pattern = re.compile(r"^\s*\d{1,3}([.,]\d+)?\s+")
 
     for line in lines:
         if pos_pattern.match(line) and current_item:
@@ -150,10 +194,36 @@ def split_into_items(table_text: str):
 
     return items
 
+# Removing this because it was filtering out valid items in some cases
+# def is_valid_item(chunk: str) -> bool:
+#     return bool(re.search(r"\d+[,\.]\d{2}", chunk)) and \
+#            bool(re.search(r"\d+\s*(pc|pcs|stk)", chunk.lower()))
 
-def is_valid_item(chunk: str) -> bool:
-    return bool(re.search(r"\d+[,\.]\d{2}", chunk)) and \
-           bool(re.search(r"\d+\s*(pc|pcs|stk)", chunk.lower()))
+def strip_code_fences(text: str) -> str:
+    """
+    Removes markdown code fences like:
+    ```plaintext
+    ```
+    ```python
+    ```
+    """
+    text = re.sub(r"```[a-zA-Z]*", "", text)  # remove ```plaintext etc
+    text = text.replace("```", "")
+    return text.strip()
+
+def normalize_none_fields(item_block: str) -> str:
+    lines = []
+
+    for line in item_block.splitlines():
+        if ":" in line:
+            key, value = line.split(":", 1)
+
+            if value.strip().lower() in ("none", "null"):
+                line = f"{key}:"
+
+        lines.append(line)
+
+    return "\n".join(lines)
 
 
 def clean_item_text(item_text: str) -> str:
@@ -217,28 +287,40 @@ def main():
                     client
                 )
 
-                items = [
-                    i for i in split_into_items(
-                        extract_table_region(full_text)
-                    )
-                    if is_valid_item(i)
-                ]
-
-                logging.info("Found %d item(s)", len(items))
-
                 outfile.write("\n" + "=" * 80 + "\n")
                 outfile.write(f"PDF FILE: {pdf_name}\n")
                 outfile.write("=" * 80 + "\n\n")
-                outfile.write(base_data + "\n\n")
+                outfile.write(strip_code_fences(base_data) + "\n\n")
 
-                for idx, item in enumerate(items, start=1):
-                    outfile.write(
+                raw_items = split_into_items(
+                    extract_table_region(full_text)
+                )
+
+                valid_items = []
+
+                for item in raw_items:
+                    raw_item = strip_code_fences(
                         structure_item_with_llm(
                             clean_item_text(item),
                             client
-                        ) + "\n\n"
+                        )
                     )
-                logging.info("Processed %d/%d item(s)", idx, len(items))
+                    normalized_item = normalize_part_quantity(raw_item)
+                    normalized_item = normalize_none_fields(normalized_item)
+
+                    if not is_fully_empty_item(normalized_item):
+                        valid_items.append(normalized_item)
+
+                logging.info(
+                    "Extracted %d valid item(s)",
+                    len(valid_items)
+                )
+
+                # Write output
+                for item in valid_items:
+                    outfile.write(item + "\n\n")
+
+                logging.info("Processed %d item(s)", len(valid_items))
 
                 # Move processed PDF
                 shutil.move(
