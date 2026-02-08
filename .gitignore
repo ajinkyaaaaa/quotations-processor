@@ -11,3 +11,6 @@ __pycache__/
 
 # Virtual environment
 venv/
+
+# PDFs / input files
+quotations/*.pdf
