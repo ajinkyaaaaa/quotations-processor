@@ -115,6 +115,46 @@ ITEM TEXT:
 # -----------------------------
 # CORE FUNCTIONS
 # -----------------------------
+
+def remove_existing_pdf_block(output_text: str, pdf_name: str) -> str:
+    blocks = re.split(r"(?:\r?\n)?={10,}\r?\nPDF FILE:\s*", output_text)
+
+    if len(blocks) == 1:
+        return output_text.strip()
+
+    cleaned = [blocks[0].strip()]  # text before first block
+
+    for block in blocks[1:]:
+        # block starts with "<pdf_name>\n=====..."
+        if block.startswith(pdf_name):
+            continue  # skip this block completely
+        cleaned.append("=" * 80 + "\nPDF FILE: " + block.strip())
+
+    return "\n".join([c for c in cleaned if c]).strip()
+
+def upsert_pdf_output(pdf_name: str, new_block: str):
+    """
+    Ensures only one entry per PDF exists in OUTPUT_FILE.
+    If PDF already exists, remove its block and write updated one.
+    """
+    existing_text = ""
+
+    if os.path.exists(OUTPUT_FILE):
+        with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
+            existing_text = f.read()
+
+    # Remove old entry for this pdf if exists
+    cleaned_text = remove_existing_pdf_block(existing_text, pdf_name)
+
+    # Append new entry
+    if cleaned_text:
+        cleaned_text += "\n\n"
+
+    cleaned_text += new_block.strip() + "\n"
+
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        f.write(cleaned_text)
+
 def extract_text_from_pdf(pdf_path: str) -> str:
     pages = []
     with pdfplumber.open(pdf_path) as pdf:
@@ -308,62 +348,63 @@ def main():
     logging.info("[Start] Found %d PDFs", len(pdf_files))
 
     count = 1
-    with open(OUTPUT_FILE, "a", encoding="utf-8") as outfile:
-        for pdf_name in pdf_files:
-            pdf_path = os.path.join(PDF_FOLDER, pdf_name)
-            logging.info(f"[{count}/{len(pdf_files)}] Processing PDF: %s", pdf_name)
-            count += 1
-            try:
-                full_text = extract_text_from_pdf(pdf_path)
+    for pdf_name in pdf_files:
+        pdf_path = os.path.join(PDF_FOLDER, pdf_name)
+        logging.info(f"[{count}/{len(pdf_files)}] Processing PDF: %s", pdf_name)
+        count += 1
+        try:
+            full_text = extract_text_from_pdf(pdf_path)
 
-                base_data = extract_base_data_with_llm(
-                    extract_header_region(full_text),
-                    client
-                )
+            base_data = extract_base_data_with_llm(
+                extract_header_region(full_text),
+                client
+            )
 
-                outfile.write("\n" + "=" * 80 + "\n")
-                outfile.write(f"PDF FILE: {pdf_name}\n")
-                outfile.write("=" * 80 + "\n\n")
-                outfile.write(strip_code_fences(base_data) + "\n\n")
+            block = "\n" + "=" * 80 + "\n"
+            block += f"PDF FILE: {pdf_name}\n"
+            block += "=" * 80 + "\n\n"
+            block += strip_code_fences(base_data) + "\n\n"
 
-                raw_items = split_into_items(
-                    extract_table_region(full_text)
-                )
+            raw_items = split_into_items(
+                extract_table_region(full_text)
+            )
 
-                valid_items = []
+            valid_items = []
 
-                for item in raw_items:
-                    raw_item = strip_code_fences(
-                        structure_item_with_llm(
-                            clean_item_text(item),
-                            client
-                        )
+            for item in raw_items:
+                raw_item = strip_code_fences(
+                    structure_item_with_llm(
+                        clean_item_text(item),
+                        client
                     )
-                    normalized_item = normalize_part_quantity(raw_item)
-                    normalized_item = normalize_none_fields(normalized_item)
-
-                    if not is_fully_empty_item(normalized_item):
-                        valid_items.append(normalized_item)
-
-                logging.info(
-                    "Extracted %d valid item(s)",
-                    len(valid_items)
                 )
+                normalized_item = normalize_part_quantity(raw_item)
+                normalized_item = normalize_none_fields(normalized_item)
 
-                # Write output
-                for item in valid_items:
-                    outfile.write(item + "\n\n")
+                if not is_fully_empty_item(normalized_item):
+                    valid_items.append(normalized_item)
 
-                logging.info("Processed %d item(s)", len(valid_items))
+            logging.info(
+                "Extracted %d valid item(s)",
+                len(valid_items)
+            )
 
-                # Move processed PDF
-                shutil.move(
-                    pdf_path,
-                    os.path.join(PROCESSED_DIR, pdf_name)
-                )
+            # Write output
+            for item in valid_items:
+                block += item + "\n\n"
 
-            except Exception as e:
-                logging.error("[Failure] Failed processing %s: %s", pdf_name, e)
+            upsert_pdf_output(pdf_name, block)
+
+            logging.info("Processed %d item(s)", len(valid_items))
+
+            # Move processed PDF
+            shutil.move(
+                pdf_path,
+                os.path.join(PROCESSED_DIR, pdf_name)
+            )
+
+        except Exception as e:
+            logging.error("[Failure] Failed processing %s: %s", pdf_name, e)
 
     logging.info(">> Executed. Output written to %s\n", OUTPUT_FILE)
 
