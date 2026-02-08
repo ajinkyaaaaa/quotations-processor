@@ -1,6 +1,6 @@
 import pdfplumber
 
-pdf_path = r"C:\Users\Ajinkya\Desktop\Projects\quotations-processor\quotations\1000105_VIKAS.pdf"
+pdf_path = r"C:\Users\Ajinkya\Desktop\Projects\quotations-processor\quotations\1007989_VIKAS.pdf"
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     pages = []
