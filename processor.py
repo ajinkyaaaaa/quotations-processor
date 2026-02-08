@@ -18,6 +18,10 @@ TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", 0))
 TABLE_START = os.getenv("TABLE_START")
 TABLE_END = os.getenv("TABLE_END")
 
+# Alternatives
+alt_TABLE_START = os.getenv("ALTERNATIVE_TABLE_START")
+alt_TABLE_END = os.getenv("ALTERNATIVE_TABLE_END")
+
 # -----------------------------
 # PATHS (ENV + SCRIPT RELATIVE)
 # -----------------------------
@@ -156,10 +160,31 @@ def is_fully_empty_item(item_block: str) -> bool:
     return True
 
 
+# def extract_table_region(full_text: str) -> str:
+#     if TABLE_START not in full_text or TABLE_END not in full_text:
+#         raise ValueError("Table boundaries not found")
+#     return full_text.split(TABLE_START, 1)[1].split(TABLE_END, 1)[0].strip()
+
 def extract_table_region(full_text: str) -> str:
-    if TABLE_START not in full_text or TABLE_END not in full_text:
-        raise ValueError("Table boundaries not found")
-    return full_text.split(TABLE_START, 1)[1].split(TABLE_END, 1)[0].strip()
+    # Choose start token
+    if TABLE_START and TABLE_START in full_text:
+        start_token = TABLE_START
+    elif alt_TABLE_START and alt_TABLE_START in full_text:
+        start_token = alt_TABLE_START
+    else:
+        raise ValueError("Table start boundary not found (TABLE_START or ALTERNATIVE_TABLE_START)")
+
+    # Choose end token
+    if TABLE_END and TABLE_END in full_text:
+        end_token = TABLE_END
+    elif alt_TABLE_END and alt_TABLE_END in full_text:
+        end_token = alt_TABLE_END
+    else:
+        raise ValueError("Table end boundary not found (TABLE_END or ALTERNATIVE_TABLE_END)")
+
+    return full_text.split(start_token, 1)[1].split(end_token, 1)[0].strip()
+
+
 
 def is_table_header_block(block: str) -> bool:
     header_markers = [
@@ -171,11 +196,20 @@ def is_table_header_block(block: str) -> bool:
     return all(h.lower() in block_lower for h in header_markers)
 
 
-def extract_header_region(full_text: str) -> str:
-    if TABLE_START not in full_text:
-        raise ValueError("Table start boundary not found")
-    return full_text.split(TABLE_START, 1)[0].strip()
+# def extract_header_region(full_text: str) -> str:
+#     if TABLE_START not in full_text:
+#         raise ValueError("Table start boundary not found")
+#     return full_text.split(TABLE_START, 1)[0].strip()
 
+def extract_header_region(full_text: str) -> str:
+    if TABLE_START and TABLE_START in full_text:
+        start_token = TABLE_START
+    elif alt_TABLE_START and alt_TABLE_START in full_text:
+        start_token = alt_TABLE_START
+    else:
+        raise ValueError("Table start boundary not found (TABLE_START or ALTERNATIVE_TABLE_START)")
+
+    return full_text.split(start_token, 1)[0].strip()
 
 def split_into_items(table_text: str):
     lines = table_text.split("\n")
@@ -274,7 +308,7 @@ def main():
     logging.info("[Start] Found %d PDFs", len(pdf_files))
 
     count = 1
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
+    with open(OUTPUT_FILE, "a", encoding="utf-8") as outfile:
         for pdf_name in pdf_files:
             pdf_path = os.path.join(PDF_FOLDER, pdf_name)
             logging.info(f"[{count}/{len(pdf_files)}] Processing PDF: %s", pdf_name)
