@@ -365,7 +365,7 @@ def main():
             except Exception as e:
                 logging.error("[Failure] Failed processing %s: %s", pdf_name, e)
 
-    logging.info("[Success] Processing completed. Output written to %s\n", OUTPUT_FILE)
+    logging.info(">> Executed. Output written to %s\n", OUTPUT_FILE)
 
 
 # -----------------------------
